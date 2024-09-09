@@ -48,7 +48,12 @@ class COW final {
   typename COWBeaf::iterator StrBeg;
   typename COWBeaf::iterator StrEnd;
 
-  static void tryDelete(COWBeaf *BufPtr) {}
+  static void tryDelete(COWBeaf *BufPtr) noexcept {
+    if (!BufPtr || BufPtr->getRefCount() != 0u)
+      return;
+    
+    delete BufPtr;
+  }
 
 public:
   COW() = default;
@@ -121,7 +126,21 @@ public:
   public:
     using iterator = typename std::vector<COW>::iterator;
 
-    Tokenizer(const COW<T> &Cow, T Separator) {}
+    Tokenizer(const COW<T> &Cow, T Separator) {
+      auto SubBeg = Cow.begin();
+      auto End = Cow.end();
+
+      while (SubBeg != End) {
+        auto SubStrEnd = std::find(SubBeg, End, Separator);
+        if (SubBeg != SubStrEnd)
+          Tokens.emplace_back(SubBeg, SubStrEnd);
+        
+        SubBeg = std::find_if(SubStrEnd, End, 
+          [Separator](auto &&Char) {
+            return Char != Separator;
+          });
+      }
+    }
     
     Tokenizer(const Tokenizer &) = delete;
     Tokenizer(Tokenizer &&) = default;
