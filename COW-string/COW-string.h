@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <ranges>
+#include <cassert>
+
+namespace bicycle {
 
 template <typename T>
 class COW final { 
@@ -56,6 +60,8 @@ class COW final {
   }
 
 public:
+  using iterator = typename COWBeaf::iterator;
+
   COW() = default;
   
   template <typename It>
@@ -75,12 +81,14 @@ public:
   }
 
   COW &operator =(const COW &OldCow) {
-    BufPtr->removeRef();
+    if (BufPtr)
+      BufPtr->removeRef();
     tryDelete(BufPtr);
 
     BufPtr = OldCow.BufPtr;
     StrBeg = OldCow.StrBeg;
     StrEnd = OldCow.StrEnd;
+    BufPtr->incRef();
     return *this;
   }
 
@@ -92,6 +100,8 @@ public:
   }
 
   ~COW() {
+    if (!BufPtr)
+      return;
     BufPtr->removeRef();
     tryDelete(BufPtr);
   }
@@ -114,9 +124,17 @@ public:
     StrEnd = BufPtr->end();
   }
 
+  iterator begin() const { return StrBeg; }
+  iterator end() const { return StrEnd; }
+
+  size_t size() const {
+    return BufPtr ? std::distance(StrBeg, StrEnd) : 0u;
+  }
+
   size_t find(const COW &CowToFind) {
-    auto SubStrBeg = std::search(StrBeg, StrEnd,
-                                 StrBeg, StrEnd);
+    auto SubStrBeg =
+      std::search(StrBeg, StrEnd,
+                  CowToFind.StrBeg, CowToFind.StrEnd);
     return std::distance(StrBeg, SubStrBeg);
   }
 
@@ -149,5 +167,19 @@ public:
 
     iterator begin() { return Tokens.begin(); }
     iterator end() { return Tokens.end(); }
+    size_t size() const noexcept { return Tokens.size(); }
   };
 };
+
+template <typename To, typename From>
+To transformCOW(const COW<From> &Str);
+
+template <>
+std::string transformCOW(const COW<char> &Str) {
+  auto Res = std::string{};
+  for (auto Pos : std::ranges::iota_view{0u, Str.size()})
+    Res += Str.get(Pos);
+  return Res;
+}
+
+} // namespace bicycle
